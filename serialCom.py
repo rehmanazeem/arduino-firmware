@@ -1,91 +1,76 @@
-import serial
+"""Interactive USB-serial client for an Arduino; type `q` to quit."""
+from __future__ import annotations
+
+import argparse
+import sys
 import time
 
-# Replace 'COM3' with the port your Arduino is connected to (e.g., '/dev/ttyUSB0' on Linux or '/dev/ttyACM0' on Mac)
+import serial
 import serial.tools.list_ports
 
-# List available ports
-ports = list(serial.tools.list_ports.comports())
+from common import add_serial_args, is_quit
 
-# Let the user choose the port
-port_index = 4
-arduino_port = ports[port_index].device
-baud_rate = 9600  # Match the baud rate with the Arduino code
+DEFAULT_PORT_INDEX = 4  # index into the list of detected serial ports
 
-try:
-    # Establish serial connection
-    ser = serial.Serial(arduino_port, baud_rate, timeout=1)
-    time.sleep(1)  # Wait for the connection to initialize
 
+def pick_port(devices: list[str], index: int) -> str:
+    """Return the device at `index`, with a clear error when out of range."""
+    if not 0 <= index < len(devices):
+        raise IndexError(f"port index {index} out of range; detected: {devices or 'none'}")
+    return devices[index]
+
+
+def normalize_command(raw: str) -> str | None:
+    """Upper-case a typed command; None means the user asked to quit."""
+    cmd = raw.upper()
+    return None if is_quit(cmd, "q") else cmd
+
+
+def run(ser: serial.Serial) -> None:
+    """Print pending device output, then prompt and send one command per loop."""
     print("Connected to Arduino. Ready to send commands. Type 'q' to quit.")
     while True:
-        while ser.in_waiting > 0:  # Check if data is available
-            data = ser.readline().decode('utf-8').strip()  # Read and decode the data
-            print(f"Response: {data}")
+        while ser.in_waiting > 0:
+            print(f"Response: {ser.readline().decode('utf-8').strip()}")
 
-        # Send data to Arduino
-        data = input("Command: ").upper()
-        if data.lower() == 'q':
+        cmd = normalize_command(input("Command: "))
+        if cmd is None:
             break
-        ser.write(data.encode())
-        print(f"Sending Command: {data}")
+        ser.write(cmd.encode())
+        print(f"Sending Command: {cmd}")
+        time.sleep(2)  # wait for the data to be sent
 
-        time.sleep(2)  # Wait for the data to be sent
-        
 
-except serial.SerialException as e:
-    print(f"Error: {e}")
-except KeyboardInterrupt:
-    print("\nExiting...")
-finally:
-    if 'ser' in locals() and ser.is_open:
-        ser.close()
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_serial_args(parser)
+    parser.add_argument("--index", type=int, default=DEFAULT_PORT_INDEX,
+                        help="index into detected ports, used when --port is omitted (default: %(default)s)")
+    parser.add_argument("--list", action="store_true", help="list detected serial ports and exit")
+    args = parser.parse_args(argv)
 
-# # baud_rate = 9600  # Match this with the baud rate set in your Arduino sketch
+    devices = [p.device for p in serial.tools.list_ports.comports()]
+    if args.list:
+        for i, dev in enumerate(devices):
+            print(f"{i}: {dev}")
+        return 0
 
-# # # Initialize serial connection
-# # ser = serial.Serial(arduino_port, baud_rate)
-# # time.sleep(1)  # Wait for the connection to initialize
+    ser = None
+    try:
+        port = args.port or pick_port(devices, args.index)
+        ser = serial.Serial(port, args.baud, timeout=1)
+        time.sleep(1)  # wait for the connection to initialize
+        run(ser)
+    except (serial.SerialException, IndexError) as e:
+        print(f"Error: {e}")
+        return 1
+    except KeyboardInterrupt:
+        print("\nExiting...")
+    finally:
+        if ser is not None and ser.is_open:
+            ser.close()
+    return 0
 
-# # # Function to send data to Arduino
-# # def send_data(data):
-# #     ser.write(data.encode())  # Send data as bytes
 
-# # # Example usage
-# # while True:
-# #     data = input("Enter data to send (type 'q' to quit): ")
-# #     if data.lower() == 'q':
-# #         break
-    
-# #     send_data(data)
-
-# #     # # Read response from Arduino
-# #     if ser.in_waiting > 0:
-# #         response = ser.readline().decode("utf-8").strip()
-# #         print(f"Received: {response}")
-
-# # # Close serial connection
-# # ser.close()
-# # print("Serial connection closed")
-
-# # Importing Libraries 
-# import serial 
-# import time 
-# arduino = serial.Serial(port=arduino_port, baudrate=9600, timeout=.1) 
-
-# def write_read(x): 
-#     arduino.write(x.encode('utf-8'))
-#     time.sleep(0.05) 
-#     data = arduino.readline() 
-#     return data 
-
-# while True: 
-#     # num = input("Enter a number: ") # Taking input from user 
-#     # value = write_read(num) 
-#     # print(value) # printing the value 
-#     arduino.write('Hello'.encode('utf-8'))
-    
-#     if arduino.in_waiting > 0:
-#         response = arduino.readline().decode("utf-8").strip()
-#         print(f"Received: {response}")
-    
+if __name__ == "__main__":
+    sys.exit(main())

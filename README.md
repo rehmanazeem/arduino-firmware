@@ -24,10 +24,18 @@ over TCP, USB serial, or an HC-05 Bluetooth serial bridge.
 
 | File | Description |
 |------|-------------|
-| `tcp.py` | TCP client that connects to the ESP8266 (default `192.168.1.50:8080`) and sends typed numbers; sending `99` exits. |
-| `serialCom.py` | USB serial client (`pyserial`). Lists available COM ports, opens one by index, and sends typed commands at 9600 baud; reads back responses. |
-| `bluetooth.py` | Bluetooth serial client for an HC-05 module via `/dev/cu.HC-05` at 9600 baud (`pyserial`). Sends typed messages; type `exit` to quit. |
+| `tcp.py` | TCP client for the ESP8266 sketches. `--host` (default placeholder `192.168.x.x`), `--port` (default 8080). Sends typed numbers; `99` exits. |
+| `serialCom.py` | USB serial client (`pyserial`). `--port` or `--index` (into the detected port list), `--baud` (default 9600), `--list` to print ports. Type `q` to quit. |
+| `bluetooth.py` | HC-05 serial client. `--port` (default `/dev/cu.HC-05`), `--baud` (default 9600). Type `exit` to quit. |
+| `common.py` | Shared argparse options and quit-word helper. |
 | `restfulapi.py` | Empty placeholder (no implementation yet). |
+
+```mermaid
+flowchart LR
+    tcp.py -- "TCP :8080" --> ESP[ESP8266 sketches]
+    serialCom.py -- USB serial --> Arduino
+    bluetooth.py -- "HC-05 (SPP)" --> Arduino
+```
 
 ## Hardware
 
@@ -62,15 +70,23 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-- `tcp.py` — edit `esp_ip` to the IP printed by the ESP8266, then run `python tcp.py`.
-- `serialCom.py` — adjust `port_index` to match the correct serial port, then run `python serialCom.py`.
-- `bluetooth.py` — pair the HC-05 and set `port` to its device path, then run `python bluetooth.py`.
+```bash
+python tcp.py --host <esp-ip> [--port 8080]
+python serialCom.py --list            # show detected ports
+python serialCom.py --port <device>   # or --index N
+python bluetooth.py --port <device>
+```
+
+Tests for the pure logic (input validation, message framing, port selection):
+
+```bash
+pip install pytest && pytest
+```
 
 ## Limitations / next steps
 
-- WiFi credentials are hardcoded in the sketches and a device IP is hardcoded in
-  `tcp.py`; move these to placeholders or a separate (gitignored) config before
-  publishing or reusing.
+- The sketches hold placeholder WiFi credentials (`YOUR_WIFI_SSID` / `YOUR_WIFI_PASSWORD`);
+  fill them in locally and do not commit real values.
 - `ard.ino`, `tcp.ino`, and `bluetooth.ino` are near-duplicate single-relay
   servers and could be consolidated.
 - `bluetooth.ino` is named for Bluetooth but actually implements a WiFi/TCP
@@ -78,5 +94,4 @@ pip install -r requirements.txt
 - `restfulapi.py` is an empty stub.
 - No authentication on the TCP server and no input validation beyond basic
   numeric parsing; not intended for untrusted networks.
-- `serialCom.py` selects the serial port by a hardcoded index, which is brittle
-  across machines.
+- `serialCom.py` defaults to port index 4 when `--port` is not given; use `--list` to find yours.

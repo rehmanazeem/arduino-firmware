@@ -12,7 +12,7 @@ WiFiServer server(8080);
 
 // Pin definitions
 const int relay1Pin = D1;  // GPIO5
-const int relay2Pin = D2;  // GPIO5
+const int relay2Pin = D2;  // GPIO4
 const int btn1Pin = D6;            // GPIO12
 const int btn2Pin = D5;            // GPIO14
 
@@ -109,7 +109,7 @@ void handleTCPClient() {
         } 
         else if (number == 2) {
           relay2State = !relay2State;
-          digitalWrite(relay2Pin, relay2State ? HIGH : LOW);  // Relay OFF
+          digitalWrite(relay2Pin, relay2State ? HIGH : LOW);
           response = String("COMMAND {SWITCH : RELAY 2} > CURRENT STATE :") + (relay2State ? "OFF" : "ON");
         } 
         else if (number == 99) {

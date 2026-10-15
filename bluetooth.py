@@ -1,30 +1,51 @@
+"""Send typed messages to an HC-05 Bluetooth serial bridge; type `exit` to quit."""
+from __future__ import annotations
+
+import argparse
+import sys
+
 import serial
 
-# Replace '/dev/cu.HC-05' with the correct port for your HC-05
-port = '/dev/cu.HC-05'  # Update this with the correct port
-baud_rate = 9600  # Default baud rate for HC-05
+from common import add_serial_args, is_quit
 
-try:
-    # Open the serial connection
-    bluetooth = serial.Serial(port, baud_rate, timeout=1)
-    print(f"Connected to {port} at {baud_rate} baud rate.")
+DEFAULT_PORT = "/dev/cu.HC-05"  # macOS name of a paired HC-05; adjust for your OS
 
+
+def encode_message(message: str) -> bytes:
+    """Frame a message with the CRLF terminator the HC-05 side expects."""
+    return (message + "\r\n").encode("utf-8")
+
+
+def run(link: serial.Serial) -> None:
+    """Prompt loop: send each typed line until the user types `exit`."""
     print("Enter messages to send to HC-05 (type 'exit' to quit):")
     while True:
-        # Get user input for the message
         message = input(">>> ").strip()
-        if message.lower() == 'exit':
+        if is_quit(message, "exit"):
             break
-
-        # Send the message to HC-05
-        bluetooth.write((message + '\r\n').encode('utf-8'))
+        link.write(encode_message(message))
         print(f"Sent: {message}")
 
-except serial.SerialException as e:
-    print(f"Error: {e}")
 
-finally:
-    # Close the connection when done
-    if 'bluetooth' in locals() and bluetooth.is_open:
-        bluetooth.close()
-        print("Connection closed.")
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    add_serial_args(parser, default_port=DEFAULT_PORT)
+    args = parser.parse_args(argv)
+
+    link = None
+    try:
+        link = serial.Serial(args.port, args.baud, timeout=1)
+        print(f"Connected to {args.port} at {args.baud} baud rate.")
+        run(link)
+    except serial.SerialException as e:
+        print(f"Error: {e}")
+        return 1
+    finally:
+        if link is not None and link.is_open:
+            link.close()
+            print("Connection closed.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
