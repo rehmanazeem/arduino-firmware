@@ -1,0 +1,22 @@
+# Arduino / PlatformIO build artifacts
+build/
+*.hex
+*.elf
+*.bin
+*.map
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.Python
+
+# OS files
+.DS_Store
+Thumbs.db
